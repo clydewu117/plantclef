@@ -1,2 +1,8 @@
 wandb/
 checkpoints/
+# model checkpoints
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+
