@@ -16,12 +16,13 @@ def get_dataloaders(
     eval_transform,
     batch_size=128,
     num_workers=8,
+    data_root=None,
 ):
     label_map = get_label_map(train_csv)
 
-    train_ds = PlantCLEFDataset(train_csv, transform=train_transform, label_map=label_map)
-    val_ds   = PlantCLEFDataset(val_csv,   transform=eval_transform,  label_map=label_map)
-    test_ds  = PlantCLEFDataset(test_csv,  transform=eval_transform,  label_map=label_map)
+    train_ds = PlantCLEFDataset(train_csv, transform=train_transform, label_map=label_map, data_root=data_root)
+    val_ds   = PlantCLEFDataset(val_csv,   transform=eval_transform,  label_map=label_map, data_root=data_root)
+    test_ds  = PlantCLEFDataset(test_csv,  transform=eval_transform,  label_map=label_map, data_root=data_root)
 
     common = dict(
         batch_size=batch_size,

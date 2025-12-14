@@ -5,16 +5,18 @@ from torch.utils.data import Dataset
 import os
 
 class PlantCLEFDataset(Dataset):
-    def __init__(self, csv_file, transform=None, label_map=None):
+    def __init__(self, csv_file, transform=None, label_map=None, data_root=None):
         """
         csv_file: train.csv / val.csv / test.csv
         transform: torchvision transforms
         label_map: 提供 species_id -> new_label 的字典
                     (train & val & test 必须共享同一份)
+        data_root: 数据根目录，如果CSV中是相对路径则需要指定
         """
 
         self.df = pd.read_csv(csv_file)
         self.transform = transform
+        self.data_root = data_root
 
         # species_id -> string
         self.df["species_id"] = self.df["species_id"].astype(str)
@@ -37,6 +39,10 @@ class PlantCLEFDataset(Dataset):
 
         img_path = row["image_path"]
         label = int(row["label"])
+
+        # 如果指定了 data_root，则拼接路径
+        if self.data_root is not None:
+            img_path = os.path.join(self.data_root, img_path)
 
         img = Image.open(img_path).convert("RGB")
 
