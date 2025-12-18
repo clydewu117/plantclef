@@ -46,15 +46,9 @@ def load_dinov2_model(checkpoint_path, num_classes=None):
     # Load head
     embed_dim = 768  # DINOv2 ViT-B/14 embedding dimension
     if num_classes:  # Classification head
-        head = nn.Sequential(
-            nn.Linear(embed_dim, num_classes)
-        ).to(DEVICE)
-    else:  # Retrieval projection head
-        head = nn.Sequential(
-            nn.Linear(embed_dim, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512)
-        ).to(DEVICE)
+        head = nn.Linear(embed_dim, num_classes).to(DEVICE)
+    else:  # Retrieval projection head (single linear layer to 512-dim)
+        head = nn.Linear(embed_dim, 512).to(DEVICE)
 
     head.load_state_dict(checkpoint['head'])
 
@@ -89,14 +83,11 @@ def load_convnext_model(checkpoint_path, num_classes=None):
             nn.LayerNorm(in_dim),
             nn.Linear(in_dim, num_classes)
         ).to(DEVICE)
-    else:  # Retrieval projection head
+    else:  # Retrieval projection head (3 layers: pool, flatten, linear)
         head = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(1),
-            nn.LayerNorm(in_dim),
-            nn.Linear(in_dim, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512)
+            nn.Linear(in_dim, 512)
         ).to(DEVICE)
 
     head.load_state_dict(checkpoint['head'])
