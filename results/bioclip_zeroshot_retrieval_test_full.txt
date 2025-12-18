@@ -1,0 +1,31 @@
+BioCLIP Zero-Shot Retrieval Test Results
+============================================================
+Model: BioCLIP (hf-hub:imageomics/bioclip)
+Device: cuda
+Batch Size: 256
+Number of Query Samples: 138058
+Number of Gallery Samples: 558799
+Number of Test Species: 3903
+Test Type: Zero-shot (no fine-tuning)
+============================================================
+mAP:           0.1814 (18.14%)
+Recall@1:      0.6359 (63.59%)
+Recall@5:      0.8221 (82.21%)
+Recall@10:     0.8746 (87.46%)
+Recall@20:     0.9130 (91.30%)
+Recall@50:     0.9484 (94.84%)
+Recall@100:    0.9665 (96.65%)
+============================================================
+
+Metric Descriptions:
+- mAP: Mean Average Precision across all queries
+- Recall@K: Percentage of queries where correct species appears in top-K results
+
+Task Description:
+This is a cross-species retrieval task where the model is evaluated on
+plant species that were NOT seen during training. The query and gallery
+sets contain different species from the training set.
+
+Note:
+This is a zero-shot evaluation where BioCLIP was NOT fine-tuned on the
+training set. Retrieval is performed using pre-trained image embeddings.

@@ -3,16 +3,14 @@ import math
 import torch
 import torch.nn as nn
 from torch.optim import AdamW
-from torch.amp import autocast  # ✅ 注意：用 torch.amp.autocast 支持 device_type 风格
+from torch.amp import autocast
+from torchvision.models import convnext_tiny, ConvNeXt_Tiny_Weights
 from torchvision import transforms
 
 import wandb
 
 from dataloader import get_dataloaders
 
-# =====================================================
-# Config
-# =====================================================
 DATA_ROOT = "/fs/scratch/PAS2099/plantclef"
 TRAIN_CSV = "/fs/scratch/PAS2099/plantclef/splits/train.csv"
 VAL_CSV = "/fs/scratch/PAS2099/plantclef/splits/val.csv"
@@ -21,46 +19,35 @@ TEST_CSV = "/fs/scratch/PAS2099/plantclef/splits/test.csv"
 BATCH_SIZE = 512
 EPOCHS = 10
 
-# 训练策略：先线性探针(冻backbone)再全量finetune
-FREEZE_EPOCHS = 1  # 先冻 backbone 1 epoch（你也可以改成 2）
-BASE_LR = 5e-4  # backbone lr（finetune 阶段）
-HEAD_LR = 5e-3  # head lr（通常比 backbone 大 5~20 倍）
+FREEZE_EPOCHS = 1
+BASE_LR = 5e-4
+HEAD_LR = 5e-3
 WEIGHT_DECAY = 1e-4
 
-# Scheduler
 WARMUP_EPOCHS = 1
 
-# DataLoader
-NUM_WORKERS = 8  # ✅ 你机器提示建议 max=8，这里先用 8
+NUM_WORKERS = 8
 TOP_K = 5
 PRINT_EVERY = 20
 
-DINOV2_MODEL = "dinov2_vitb14"
-
-# Wandb
 USE_WANDB = True
 WANDB_PROJECT = "plantclef"
-WANDB_RUN_NAME = "dinov2_vitb14_base_baseline"
+WANDB_RUN_NAME = "convnext_tiny_class"
 
-# Checkpoints
 CHECKPOINT_DIR = "checkpoints"
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# A100 / Ampere
 if DEVICE == "cuda":
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
     torch.backends.cudnn.benchmark = True
 
 print("Using device:", DEVICE)
-
-# =====================================================
-# Transforms (ImageNet mean/std)
-# =====================================================
-IMAGENET_MEAN = [0.485, 0.456, 0.406]
-IMAGENET_STD = [0.229, 0.224, 0.225]
+weights = ConvNeXt_Tiny_Weights.IMAGENET1K_V1
+mean = weights.transforms().mean
+std = weights.transforms().std
 
 train_transform = transforms.Compose(
     [
@@ -69,7 +56,7 @@ train_transform = transforms.Compose(
         transforms.RandomHorizontalFlip(),
         transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3),
         transforms.ToTensor(),
-        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+        transforms.Normalize(mean, std),
     ]
 )
 
@@ -78,13 +65,10 @@ eval_transform = transforms.Compose(
         transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
-        transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+        transforms.Normalize(mean, std),
     ]
 )
 
-# =====================================================
-# Data
-# =====================================================
 train_loader, val_loader, _, label_map = get_dataloaders(
     TRAIN_CSV,
     VAL_CSV,
@@ -99,15 +83,12 @@ train_loader, val_loader, _, label_map = get_dataloaders(
 num_classes = len(label_map)
 print("Num classes:", num_classes)
 
-# =====================================================
-# WandB
-# =====================================================
 if USE_WANDB:
     wandb.init(
         project=WANDB_PROJECT,
         name=WANDB_RUN_NAME,
         config={
-            "model": DINOV2_MODEL,
+            "model": "convnext_tiny",
             "batch_size": BATCH_SIZE,
             "epochs": EPOCHS,
             "freeze_epochs": FREEZE_EPOCHS,
@@ -119,32 +100,30 @@ if USE_WANDB:
             "top_k": TOP_K,
             "num_workers": NUM_WORKERS,
             "amp": "bf16",
-            "gpu": "A100-80GB",
+            "optimizer": "AdamW",
+            "loss": "CrossEntropyLoss",
+            "label_smoothing": 0.1,
         },
     )
 
-# =====================================================
-# Model
-# =====================================================
-print(f"Loading DINOv2 backbone: {DINOV2_MODEL}")
-backbone = torch.hub.load("facebookresearch/dinov2", DINOV2_MODEL)
+print("Loading ConvNeXt Tiny model...")
+model = convnext_tiny(weights=weights)
+in_dim = model.classifier[2].in_features
+
+# Split into backbone and head for dual learning rate
+backbone = nn.Sequential(*list(model.children())[:-1])
+head = nn.Sequential(
+    nn.AdaptiveAvgPool2d(1),
+    nn.Flatten(1),
+    nn.LayerNorm(in_dim),
+    nn.Linear(in_dim, num_classes),
+)
+
 backbone = backbone.to(DEVICE)
-
-feature_dim_map = {
-    "dinov2_vits14": 384,
-    "dinov2_vitb14": 768,
-    "dinov2_vitl14": 1024,
-    "dinov2_vitg14": 1536,
-}
-feature_dim = feature_dim_map[DINOV2_MODEL]
-
-head = nn.Linear(feature_dim, num_classes).to(DEVICE)
+head = head.to(DEVICE)
 
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 
-# =====================================================
-# Optimizer / Scheduler
-# =====================================================
 optimizer = AdamW(
     [
         {"params": backbone.parameters(), "lr": BASE_LR},
@@ -159,10 +138,8 @@ warmup_steps = steps_per_epoch * WARMUP_EPOCHS
 
 
 def lr_factor(step: int) -> float:
-    # linear warmup -> cosine decay
     if warmup_steps > 0 and step < warmup_steps:
         return float(step) / float(max(1, warmup_steps))
-    # cosine after warmup
     denom = max(1, total_steps - warmup_steps)
     progress = (step - warmup_steps) / float(denom)
     return 0.5 * (1.0 + math.cos(math.pi * min(1.0, progress)))
@@ -171,30 +148,11 @@ def lr_factor(step: int) -> float:
 scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_factor)
 
 
-# =====================================================
-# Helpers
-# =====================================================
-def get_cls_features(x: torch.Tensor) -> torch.Tensor:
-    """
-    DINOv2 正确特征提取：forward_features -> x_norm_clstoken
-    """
-    out = backbone.forward_features(x)
-    # 不同版本 key 可能略有差别，但 dinov2 官方一般是这个
-    if "x_norm_clstoken" not in out:
-        raise KeyError(
-            f"forward_features keys = {list(out.keys())}, expected 'x_norm_clstoken'"
-        )
-    return out["x_norm_clstoken"]  # [B, D]
-
-
 def freeze_backbone(do_freeze: bool):
     for p in backbone.parameters():
         p.requires_grad = not do_freeze
 
 
-# =====================================================
-# Train / Eval
-# =====================================================
 def train_one_epoch(epoch: int):
     backbone.train()
     head.train()
@@ -210,15 +168,13 @@ def train_one_epoch(epoch: int):
 
         optimizer.zero_grad(set_to_none=True)
 
-        # ✅ bf16 autocast（A100 友好）
         with autocast("cuda", dtype=torch.bfloat16, enabled=(DEVICE == "cuda")):
-            feats = get_cls_features(imgs)
+            feats = backbone(imgs)
             logits = head(feats)
             loss = criterion(logits, labels)
 
         loss.backward()
 
-        # ✅ 梯度裁剪（更稳）
         torch.nn.utils.clip_grad_norm_(head.parameters(), 1.0)
         if any(p.requires_grad for p in backbone.parameters()):
             torch.nn.utils.clip_grad_norm_(backbone.parameters(), 1.0)
@@ -284,9 +240,8 @@ def evaluate():
         imgs = imgs.to(DEVICE, non_blocking=True)
         labels = labels.to(DEVICE, non_blocking=True)
 
-        # eval 也可以 autocast（更快）
         with autocast("cuda", dtype=torch.bfloat16, enabled=(DEVICE == "cuda")):
-            feats = get_cls_features(imgs)
+            feats = backbone(imgs)
             logits = head(feats)
             loss = criterion(logits, labels)
 
@@ -303,13 +258,9 @@ def evaluate():
     return total_loss / total, correct1 / total, correct5 / total
 
 
-# =====================================================
-# Training Loop
-# =====================================================
 best_val_acc = 0.0
 
 for epoch in range(1, EPOCHS + 1):
-    # stage-wise: freeze -> finetune
     if epoch <= FREEZE_EPOCHS:
         freeze_backbone(True)
         print(f"[Epoch {epoch}] Backbone frozen (linear probe stage)")
@@ -341,7 +292,7 @@ for epoch in range(1, EPOCHS + 1):
 
     if val_acc > best_val_acc:
         best_val_acc = val_acc
-        ckpt_path = os.path.join(CHECKPOINT_DIR, "dinov2_best.pth")
+        ckpt_path = os.path.join(CHECKPOINT_DIR, "convnext_class_best.pth")
         torch.save(
             {
                 "backbone": backbone.state_dict(),

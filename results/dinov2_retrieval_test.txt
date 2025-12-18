@@ -1,0 +1,28 @@
+DINOv2 ViT-B/14 Retrieval Test Results
+============================================================
+Model: dinov2_vitb14
+Checkpoint: checkpoints/dinov2_retrieval_best.pth
+Device: cuda
+Batch Size: 256
+Embedding Dimension: 512
+Number of Query Samples: 10000 (limited from full dataset)
+Number of Gallery Samples: 50000 (limited from full dataset)
+Number of Test Species: 3903
+============================================================
+mAP:           0.3790 (37.90%)
+Recall@1:      0.8541 (85.41%)
+Recall@5:      0.9463 (94.63%)
+Recall@10:     0.9628 (96.28%)
+Recall@20:     0.9767 (97.67%)
+Recall@50:     0.9860 (98.60%)
+Recall@100:    0.9910 (99.10%)
+============================================================
+
+Metric Descriptions:
+- mAP: Mean Average Precision across all queries
+- Recall@K: Percentage of queries where correct species appears in top-K results
+
+Task Description:
+This is a cross-species retrieval task where the model is evaluated on
+plant species that were NOT seen during training. The query and gallery
+sets contain different species from the training set.

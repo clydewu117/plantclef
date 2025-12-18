@@ -1,0 +1,11 @@
+ConvNeXt Tiny Classification Test Results
+============================================================
+Checkpoint: checkpoints/convnext_class_best.pth
+Device: cuda
+Batch Size: 256
+Number of Classes: 7806
+============================================================
+Test Loss:     1.6813
+Test Top-1:    0.6475 (64.75%)
+Test Top-5:    0.8621 (86.21%)
+============================================================

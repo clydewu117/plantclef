@@ -1,6 +1,6 @@
 from dataset import PlantCLEFDataset
 
-ds = PlantCLEFDataset("splits/train.csv")
+ds = PlantCLEFDataset("/fs/scratch/PAS2099/plantclef/splits/train.csv")
 
 print("Dataset length:", len(ds))
 

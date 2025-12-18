@@ -1,0 +1,16 @@
+BioCLIP Zero-Shot Test Results
+============================================================
+Model: BioCLIP (hf-hub:imageomics/bioclip)
+Device: cuda
+Batch Size: 256
+Number of Classes: 7806
+Test Type: Zero-shot (no fine-tuning)
+============================================================
+Test Top-1:    0.2650 (26.50%)
+Test Top-5:    0.4571 (45.71%)
+============================================================
+
+Note:
+This is a zero-shot evaluation where the model was NOT fine-tuned
+on the training set. Classification is performed by matching image
+embeddings with text embeddings of species names.

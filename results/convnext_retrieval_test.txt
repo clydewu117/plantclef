@@ -1,0 +1,27 @@
+ConvNeXt Tiny Retrieval Test Results
+============================================================
+Checkpoint: checkpoints/convnext_retrieval_best.pth
+Device: cuda
+Batch Size: 256
+Embedding Dimension: 512
+Number of Query Samples: 10000 (limited from full dataset)
+Number of Gallery Samples: 50000 (limited from full dataset)
+Number of Test Species: 3903
+============================================================
+mAP:           0.0775 (7.75%)
+Recall@1:      0.4991 (49.91%)
+Recall@5:      0.7252 (72.52%)
+Recall@10:     0.7977 (79.77%)
+Recall@20:     0.8594 (85.94%)
+Recall@50:     0.9205 (92.05%)
+Recall@100:    0.9529 (95.29%)
+============================================================
+
+Metric Descriptions:
+- mAP: Mean Average Precision across all queries
+- Recall@K: Percentage of queries where correct species appears in top-K results
+
+Task Description:
+This is a cross-species retrieval task where the model is evaluated on
+plant species that were NOT seen during training. The query and gallery
+sets contain different species from the training set.

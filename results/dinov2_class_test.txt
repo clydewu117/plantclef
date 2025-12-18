@@ -1,0 +1,12 @@
+DINOv2 ViT-B/14 Classification Test Results
+============================================================
+Model: dinov2_vitb14
+Checkpoint: checkpoints/dinov2_class_best.pth
+Device: cuda
+Batch Size: 256
+Number of Classes: 7806
+============================================================
+Test Loss:     1.5232
+Test Top-1:    0.6999 (69.99%)
+Test Top-5:    0.8941 (89.41%)
+============================================================

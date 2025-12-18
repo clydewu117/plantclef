@@ -2,20 +2,14 @@ import os
 import random
 import csv
 
-# =========================
-# 配置区
-# =========================
-DATA_ROOT = "full"      # 你的真实数据目录
-OUT_DIR = "splits"      # 输出 CSV
+DATA_ROOT = "/fs/scratch/PAS2099/plantclef/full"
+OUT_DIR = "/fs/scratch/PAS2099/plantclef/splits"
 SEED = 42
-MAX_PER_CLASS = None    # e.g. 100；None = 不限制
+MAX_PER_CLASS = None  # e.g. 100; None = no limit
 
 random.seed(SEED)
 os.makedirs(OUT_DIR, exist_ok=True)
 
-# =========================
-# 划分规则
-# =========================
 def split_counts(n):
     if n >= 30:
         n_train = int(0.8 * n)
@@ -31,9 +25,6 @@ def split_counts(n):
         n_train, n_val, n_test = n, 0, 0
     return n_train, n_val, n_test
 
-# =========================
-# 主逻辑
-# =========================
 splits = {"train": [], "val": [], "test": []}
 
 species_ids = sorted(os.listdir(DATA_ROOT))
@@ -77,9 +68,6 @@ for species_id in species_ids:
             img_path = os.path.join(DATA_ROOT, species_id, img)
             splits[split].append((img_path, species_id))
 
-# =========================
-# 写 CSV
-# =========================
 for split, rows in splits.items():
     out_csv = os.path.join(OUT_DIR, f"{split}.csv")
     with open(out_csv, "w", newline="") as f:
@@ -89,4 +77,4 @@ for split, rows in splits.items():
 
     print(f"✅ Saved {len(rows)} samples to {out_csv}")
 
-print("🎉 数据集划分完成")
+print("🎉 Dataset split completed")

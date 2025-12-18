@@ -1,6 +1,7 @@
 wandb/
 checkpoints/
 
-checkpoints/
 *.pth
 
+__pycache__/
+*.pyc
